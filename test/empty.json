@@ -1,0 +1,24 @@
+{
+ "run_id": "1793640100-4243",
+ "run_dir": "/home/runner/work/repo/repo/.git/reapr/runs/1793640100-4243",
+ "engine": "stryker",
+ "base": "origin/main",
+ "ranges": [],
+ "score": null,
+ "counts": {
+  "killed": 0,
+  "survived": 0,
+  "no_coverage": 0,
+  "timeout": 0,
+  "compile_error": 0,
+  "runtime_error": 0,
+  "ignored": 0,
+  "pending": 0
+ },
+ "survivors": [],
+ "duration_ms": 412,
+ "min_score": null,
+ "passed": true,
+ "engine_gate_failed": false,
+ "warnings": []
+}

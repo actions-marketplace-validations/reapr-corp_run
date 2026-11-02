@@ -1,0 +1,147 @@
+name: rpr
+description: Reapr (rpr) mutation testing scoped to your pull request diff.
+author: reapr-corp
+branding:
+  icon: scissors
+  color: gray-dark
+
+inputs:
+  base:
+    description: Base branch to diff against (diff is origin/<base>...HEAD). Defaults to the pull request base.
+    default: ${{ github.base_ref }}
+  min-score:
+    description: Fail (exit 1) when the mutation score is below this value (0-100).
+    required: false
+  config:
+    description: Path to the engine config, relative to working-directory. Detected when omitted. Not with configs.
+    required: false
+  configs:
+    description: >-
+      Several engine configs, one path per line (relative to working-directory; blank lines and # comments
+      ignored). rpr runs once per config in this step and the summary combines them. Not with config.
+    required: false
+    default: ''
+  working-directory:
+    description: Project directory to run in.
+    default: .
+  version:
+    description: Reapr version to install (e.g. 0.1.0), or latest.
+    default: latest
+  github-token:
+    description: >-
+      Not needed: reapr-corp/reapr is public. Only for installing from a private fork or mirror of its
+      releases; when set, the release assets are fetched through the GitHub API (gh release download).
+    required: false
+    default: ''
+
+outputs:
+  score:
+    description: Mutation score (0-100), empty when nothing was mutated, on error, and with configs.
+    value: ${{ steps.run.outputs.score }}
+  passed:
+    description: true or false. With configs, true only when every config passed.
+    value: ${{ steps.run.outputs.passed }}
+  run-id:
+    description: >-
+      Reapr run id (the run record is in <git dir>/reapr/runs/<run-id>/), empty on error and with configs
+      (see results).
+    value: ${{ steps.run.outputs.run-id }}
+  results:
+    description: >-
+      Path to a JSON file: an array with one {config, exit_code, result} per run, where result is the
+      rpr --json document ({"error": ...} on exit code 2). config is null when it was detected.
+    value: ${{ steps.run.outputs.results }}
+
+runs:
+  using: composite
+  steps:
+    - name: Check runner
+      if: runner.os != 'Linux'
+      shell: bash
+      run: |
+        echo "::error title=Reapr::rpr supports Linux runners only for now (runner.os=$RUNNER_OS)."
+        exit 2
+
+    - name: Check inputs
+      id: resolve
+      shell: bash
+      env:
+        REAPR_BASE: ${{ inputs.base }}
+        REAPR_VERSION: ${{ inputs.version }}
+        REAPR_CONFIG: ${{ inputs.config }}
+        REAPR_CONFIGS: ${{ inputs.configs }}
+      run: |
+        if [ -z "$REAPR_BASE" ]; then
+          echo "::error title=Reapr::No base branch. Run on a pull_request event or set the 'base' input (e.g. base: main)."
+          exit 2
+        fi
+        if [ -n "$REAPR_CONFIG" ] && [ -n "${REAPR_CONFIGS//[[:space:]]/}" ]; then
+          echo "::error title=Reapr::Set either 'config' (one engine config) or 'configs' (one per line), not both."
+          exit 2
+        fi
+        repo=https://github.com/reapr-corp/reapr/releases
+        tag=
+        case "$REAPR_VERSION" in
+          latest) url="$repo/latest/download" ;;
+          *)
+            if ! printf '%s' "$REAPR_VERSION" | grep -Eq '^v?[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$'; then
+              echo "::error title=Reapr::Invalid 'version' input: '$REAPR_VERSION' (expected latest or X.Y.Z)."
+              exit 2
+            fi
+            tag="v${REAPR_VERSION#v}"
+            url="$repo/download/$tag" ;;
+        esac
+        printf 'url=%s\ntag=%s\n' "$url" "$tag" >> "$GITHUB_OUTPUT"
+
+    - name: Install rpr
+      shell: bash
+      env:
+        REAPR_RELEASE_URL: ${{ steps.resolve.outputs.url }}
+        REAPR_TAG: ${{ steps.resolve.outputs.tag }}
+        REAPR_TOKEN: ${{ inputs.github-token }}
+      run: |
+        dir="$RUNNER_TEMP/rpr-bin"
+        # UNMANAGED_INSTALL: flat layout in $dir, no shell profile edits, no receipt.
+        if [ -n "$REAPR_TOKEN" ]; then
+          # Private release: browser download URLs do not take a token, so fetch the installer and the
+          # archives through the API and point the installer at the local copy (checksums are embedded).
+          dl="$RUNNER_TEMP/rpr-dl"
+          GH_TOKEN="$REAPR_TOKEN" gh release download ${REAPR_TAG:+"$REAPR_TAG"} -R reapr-corp/reapr \
+            -D "$dl" --clobber -p 'rpr-installer.sh' -p 'rpr-*.tar.xz'
+          RPR_DOWNLOAD_URL="file://$dl" RPR_UNMANAGED_INSTALL="$dir" sh "$dl/rpr-installer.sh"
+        else
+          curl --proto '=https' --tlsv1.2 -LsSf "$REAPR_RELEASE_URL/rpr-installer.sh" \
+            | RPR_UNMANAGED_INSTALL="$dir" sh
+        fi
+        test -x "$dir/rpr" || { echo "::error title=Reapr::installer did not produce $dir/rpr"; exit 2; }
+        echo "$dir" >> "$GITHUB_PATH"
+
+    - name: Fetch base ref
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        REAPR_BASE: ${{ inputs.base }}
+      run: |
+        git check-ref-format "refs/heads/$REAPR_BASE" || { echo "::error title=Reapr::Invalid base branch name: '$REAPR_BASE'"; exit 2; }
+        refspec="+refs/heads/$REAPR_BASE:refs/remotes/origin/$REAPR_BASE"
+        if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
+          # ponytail: full unshallow, not incremental --deepen; use actions/checkout fetch-depth: 0 to skip this.
+          git fetch --no-tags --unshallow origin "$refspec"
+        else
+          git fetch --no-tags origin "$refspec"
+        fi
+        git merge-base "origin/$REAPR_BASE" HEAD > /dev/null || {
+          echo "::error title=Reapr::No merge base between origin/$REAPR_BASE and HEAD."
+          exit 2
+        }
+
+    - name: Run rpr
+      id: run
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        REAPR_BASE: ${{ inputs.base }}
+        REAPR_MIN_SCORE: ${{ inputs.min-score }}
+        REAPR_CONFIG: ${{ inputs.config }}
+        REAPR_CONFIGS: ${{ inputs.configs }}
+      run: bash "$GITHUB_ACTION_PATH/run.sh"

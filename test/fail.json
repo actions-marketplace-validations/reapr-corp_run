@@ -1,0 +1,55 @@
+{
+ "run_id": "1793640200-4244",
+ "run_dir": "/home/runner/work/repo/repo/.git/reapr/runs/1793640200-4244",
+ "engine": "stryker",
+ "base": "origin/main",
+ "ranges": [
+  {
+   "path": "packages/web/src/form.ts",
+   "start": 10,
+   "end": 30
+  }
+ ],
+ "score": 40,
+ "counts": {
+  "killed": 2,
+  "survived": 2,
+  "no_coverage": 1,
+  "timeout": 0,
+  "compile_error": 0,
+  "runtime_error": 0,
+  "ignored": 0,
+  "pending": 0
+ },
+ "survivors": [
+  {
+   "file": "packages/web/src/form.ts",
+   "line": 12,
+   "column": 5,
+   "mutator": "EqualityOperator",
+   "replacement": "a <= b",
+   "status": "Survived"
+  },
+  {
+   "file": "packages/web/src/form.ts",
+   "line": 20,
+   "column": 9,
+   "mutator": "BlockStatement",
+   "replacement": "{}",
+   "status": "Survived"
+  },
+  {
+   "file": "packages/web/src/form.ts",
+   "line": 28,
+   "column": 3,
+   "mutator": "BooleanLiteral",
+   "replacement": null,
+   "status": "NoCoverage"
+  }
+ ],
+ "duration_ms": 9500,
+ "min_score": null,
+ "passed": false,
+ "engine_gate_failed": true,
+ "warnings": []
+}

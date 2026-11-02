@@ -1,0 +1,59 @@
+{
+ "run_id": "1793640000-4242",
+ "run_dir": "/home/runner/work/repo/repo/.git/reapr/runs/1793640000-4242",
+ "engine": "stryker",
+ "base": "origin/main",
+ "ranges": [
+  {
+   "path": "packages/lib/src/x.ts",
+   "start": 40,
+   "end": 44
+  },
+  {
+   "path": "packages/lib/src/x.ts",
+   "start": 90,
+   "end": 90
+  },
+  {
+   "path": "packages/lib/src/y.ts",
+   "start": 1,
+   "end": 5
+  }
+ ],
+ "score": 72.72727272727273,
+ "counts": {
+  "killed": 14,
+  "survived": 1,
+  "no_coverage": 1,
+  "timeout": 0,
+  "compile_error": 0,
+  "runtime_error": 0,
+  "ignored": 0,
+  "pending": 0
+ },
+ "survivors": [
+  {
+   "file": "packages/lib/src/x.ts",
+   "line": 42,
+   "column": 7,
+   "mutator": "ConditionalExpression",
+   "replacement": "false",
+   "status": "Survived"
+  },
+  {
+   "file": "packages/lib/src/y.ts",
+   "line": 3,
+   "column": 12,
+   "mutator": "StringLiteral",
+   "replacement": "\"a|b\"",
+   "status": "NoCoverage"
+  }
+ ],
+ "duration_ms": 83000,
+ "min_score": 50,
+ "passed": true,
+ "engine_gate_failed": false,
+ "warnings": [
+  "2 changed files have no tests"
+ ]
+}
